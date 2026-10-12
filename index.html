@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d6b3a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Pitch Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: controls on top, one full-width pitch below. Pitch rotates to portrait for phones. */
+:root {
+  --bg: #edf2ee;
+  --panel: #ffffff;
+  --fg: #12201a;
+  --muted: #55695d;
+  --line: #ccd8d0;
+  --accent: #0d6b3a;
+  --accent-fg: #ffffff;
+  --team-a: #2f7df6;
+  --team-b: #e8553d;
+  --turf: #2f7a45;
+  --turf-alt: #2a6e3f;
+  --chalk: #f4f8f2;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1612; --panel: #17231c; --fg: #e5eee7; --muted: #93a89a; --line: #2a3a30;
+    --accent: #5fd18c; --accent-fg: #08150d; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1612; --panel: #17231c; --fg: #e5eee7; --muted: #93a89a; --line: #2a3a30;
+  --accent: #5fd18c; --accent-fg: #08150d; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 28px; display: flex; flex-direction: column; gap: 14px; }
+h1 { margin: 0; font: 700 36px/1 var(--font-display); letter-spacing: 0.03em; text-transform: uppercase; text-wrap: balance; }
+.sub { margin: 4px 0 0; color: var(--muted); }
+.bar { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-end; }
+.grp { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lbl { font: 600 11px/1 var(--font-body); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn, .sel {
+  font: 600 14px var(--font-body); min-height: 40px; padding: 0 14px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--fg); border-radius: 6px; cursor: pointer;
+}
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.sel { padding-inline: 10px; }
+.btn:focus-visible, .sel:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.sw { width: 40px; padding: 0; position: relative; }
+.sw::after { content: ""; position: absolute; inset: 8px; border-radius: 3px; background: var(--c); border: 1px solid rgba(0,0,0,0.35); }
+.sw[aria-pressed="true"] { background: var(--panel); border-color: var(--fg); box-shadow: 0 0 0 2px var(--fg); }
+.hint { margin: 0; color: var(--muted); min-height: 1.45em; }
+.stage { min-width: 0; }
+svg#pitch { display: block; width: 100%; height: auto; max-height: 76vh; touch-action: none; user-select: none; -webkit-user-select: none; }
+.turf { fill: var(--turf); }
+.turf-alt { fill: var(--turf-alt); }
+.lines { fill: none; stroke: var(--chalk); stroke-width: 3; opacity: 0.92; }
+.spot { fill: var(--chalk); }
+.pieces, .pieces *, .draws, .draws *, .live, .live * { pointer-events: none; }
+.tool-move .piece { pointer-events: all; cursor: grab; }
+.tool-erase .draws .hit { pointer-events: stroke; cursor: pointer; }
+.tool-pass, .tool-run, .tool-free { cursor: crosshair; }
+.ln-shadow { fill: none; stroke: rgba(4, 30, 14, 0.38); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+.ln { fill: none; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+.hit { fill: none; stroke: transparent; stroke-width: 30; }
+.p-a { fill: var(--team-a); stroke: var(--chalk); stroke-width: 3; }
+.p-b { fill: var(--team-b); stroke: var(--chalk); stroke-width: 3; }
+.p-shadow { fill: rgba(4, 30, 14, 0.3); }
+.num { fill: #fff; font: 700 23px var(--font-display); text-anchor: middle; dominant-baseline: central; }
+.ball { fill: #fff; stroke: #111; stroke-width: 2.5; }
+.ball-dot { fill: #111; }
+.foot { margin: 0; color: var(--muted); font-size: 13px; }
+.key { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+@media (max-width: 640px) { h1 { font-size: 30px; } }
+</style>
+<style>
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<main class="wrap">
+  <header>
+    <h1>Pitch Board</h1>
+    <p class="sub">Set up a formation, then draw passes, runs and pressing lines on the pitch.</p>
+  </header>
+
+  <section class="bar" id="bar" aria-label="Board controls">
+    <div class="grp">
+      <span class="lbl">Tool</span>
+      <div class="row" role="group" aria-label="Tool">
+        <button class="btn" data-tool="move" aria-pressed="true">Move</button>
+        <button class="btn" data-tool="pass" aria-pressed="false">Pass</button>
+        <button class="btn" data-tool="run" aria-pressed="false">Run</button>
+        <button class="btn" data-tool="free" aria-pressed="false">Free line</button>
+        <button class="btn" data-tool="erase" aria-pressed="false">Erase</button>
+      </div>
+    </div>
+    <div class="grp">
+      <span class="lbl">Line colour</span>
+      <div class="row" role="group" aria-label="Line colour">
+        <button class="btn sw" data-color="#ffffff" style="--c:#ffffff" aria-label="White" aria-pressed="false"></button>
+        <button class="btn sw" data-color="#ffd23f" style="--c:#ffd23f" aria-label="Yellow" aria-pressed="true"></button>
+        <button class="btn sw" data-color="#62e3ff" style="--c:#62e3ff" aria-label="Cyan" aria-pressed="false"></button>
+        <button class="btn sw" data-color="#ff7ad9" style="--c:#ff7ad9" aria-label="Pink" aria-pressed="false"></button>
+      </div>
+    </div>
+    <div class="grp">
+      <span class="lbl">Formations</span>
+      <div class="row">
+        <select class="sel" id="fa" aria-label="Your team formation"></select>
+        <select class="sel" id="fb" aria-label="Opponent formation"></select>
+      </div>
+    </div>
+    <div class="grp">
+      <span class="lbl">Board</span>
+      <div class="row">
+        <button class="btn" data-act="undo" id="undo" disabled>Undo</button>
+        <button class="btn" data-act="clear">Clear lines</button>
+        <button class="btn" data-act="opp" id="opp" aria-pressed="true">Opponents</button>
+        <button class="btn" data-act="rotate">Rotate pitch</button>
+        <button class="btn" data-act="reset">Reset</button>
+        <button class="btn" id="install" hidden>Install app</button>
+      </div>
+    </div>
+  </section>
+
+  <p class="hint" id="hint" aria-live="polite"></p>
+
+  <div class="stage">
+    <svg id="pitch" class="tool-move" viewBox="-30 -30 1110 740" role="img" aria-label="Soccer pitch tactics board">
+      <g id="world">
+        <rect x="-30" y="-30" width="1110" height="740" class="turf"/>
+        <rect x="0" y="0" width="1050" height="680" class="turf"/>
+        <g id="stripes"></g>
+        <g class="lines">
+          <rect x="0" y="0" width="1050" height="680"/>
+          <line x1="525" y1="0" x2="525" y2="680"/>
+          <circle cx="525" cy="340" r="91.5"/>
+          <rect x="0" y="138.4" width="165" height="403.2"/>
+          <rect x="885" y="138.4" width="165" height="403.2"/>
+          <rect x="0" y="248.4" width="55" height="183.2"/>
+          <rect x="995" y="248.4" width="55" height="183.2"/>
+          <path d="M165 266.9 A91.5 91.5 0 0 1 165 413.1"/>
+          <path d="M885 266.9 A91.5 91.5 0 0 0 885 413.1"/>
+          <rect x="-22" y="303.4" width="22" height="73.2"/>
+          <rect x="1050" y="303.4" width="22" height="73.2"/>
+          <path d="M10 0 A10 10 0 0 1 0 10"/>
+          <path d="M1040 0 A10 10 0 0 0 1050 10"/>
+          <path d="M0 670 A10 10 0 0 1 10 680"/>
+          <path d="M1040 680 A10 10 0 0 1 1050 670"/>
+        </g>
+        <circle class="spot" cx="525" cy="340" r="4.5"/>
+        <circle class="spot" cx="110" cy="340" r="4"/>
+        <circle class="spot" cx="940" cy="340" r="4"/>
+        <g id="draws" class="draws"></g>
+        <g id="live" class="live"></g>
+        <g id="pieces" class="pieces"></g>
+      </g>
+    </svg>
+  </div>
+
+  <p class="foot"><span class="key" style="background:var(--team-a)"></span>Your team <span class="key" style="background:var(--team-b); margin-left:10px"></span>Opponents. The board saves in this browser. Take a screenshot to share a play.</p>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var NS = 'http://www.w3.org/2000/svg';
+  var svg = document.getElementById('pitch');
+  var world = document.getElementById('world');
+  var gDraw = document.getElementById('draws');
+  var gLive = document.getElementById('live');
+  var gPieces = document.getElementById('pieces');
+  var hintEl = document.getElementById('hint');
+  var undoBtn = document.getElementById('undo');
+  var selA = document.getElementById('fa');
+  var selB = document.getElementById('fb');
+
+  function mk(tag, attrs, parent) {
+    var el = document.createElementNS(NS, tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(el);
+    return el;
+  }
+
+  // Mowing stripes
+  var stripes = document.getElementById('stripes');
+  for (var s = 1; s < 15; s += 2) mk('rect', { x: s * 70, y: 0, width: 70, height: 680, 'class': 'turf-alt' }, stripes);
+
+  // Formations: [length 0..1 across own half (0 = own goal), width 0..1]
+  var FORMS = {
+    '4-3-3': [[.05,.5],[.3,.12],[.27,.37],[.27,.63],[.3,.88],[.55,.3],[.48,.5],[.55,.7],[.85,.15],[.92,.5],[.85,.85]],
+    '4-4-2': [[.05,.5],[.3,.12],[.27,.37],[.27,.63],[.3,.88],[.6,.12],[.55,.38],[.55,.62],[.6,.88],[.9,.38],[.9,.62]],
+    '3-5-2': [[.05,.5],[.27,.25],[.24,.5],[.27,.75],[.55,.08],[.5,.3],[.44,.5],[.5,.7],[.55,.92],[.9,.38],[.9,.62]],
+    '4-2-3-1': [[.05,.5],[.3,.12],[.27,.37],[.27,.63],[.3,.88],[.45,.38],[.45,.62],[.7,.12],[.72,.5],[.7,.88],[.93,.5]],
+    '5-3-2': [[.05,.5],[.32,.07],[.27,.28],[.24,.5],[.27,.72],[.32,.93],[.55,.3],[.5,.5],[.55,.7],[.9,.38],[.9,.62]]
+  };
+  Object.keys(FORMS).forEach(function (k) {
+    [selA, selB].forEach(function (sel) { var o = document.createElement('option'); o.value = k; o.textContent = (sel === selA ? 'You ' : 'Them ') + k; sel.appendChild(o); });
+  });
+
+  function build(team, key) {
+    return FORMS[key].map(function (p, i) {
+      var x = 20 + p[0] * 470, y = 40 + p[1] * 600;
+      if (team === 'b') { x = 1050 - x; y = 680 - y; }
+      return { t: team, n: i + 1, x: Math.round(x), y: Math.round(y) };
+    });
+  }
+  function fresh(fa, fb) { return build('a', fa).concat(build('b', fb), [{ t: 'ball', x: 525, y: 340 }]); }
+
+  var KEY = 'pitch-board-v1';
+  function load() {
+    try {
+      var o = JSON.parse(localStorage.getItem(KEY));
+      if (o && Array.isArray(o.pieces) && o.pieces.length === 23 && Array.isArray(o.draws) && FORMS[o.fa] && FORMS[o.fb]) return o;
+    } catch (e) {}
+    return null;
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  var state = load() || {
+    pieces: fresh('4-3-3', '4-4-2'), draws: [], fa: '4-3-3', fb: '4-4-2',
+    tool: 'move', color: '#ffd23f', showB: true,
+    vertical: !!(window.matchMedia && window.matchMedia('(max-width: 640px)').matches)
+  };
+
+  // Undo history (pieces + lines + formations)
+  var hist = [];
+  function snapshot() { return JSON.stringify({ pieces: state.pieces, draws: state.draws, fa: state.fa, fb: state.fb }); }
+  function pushHist() { hist.push(snapshot()); if (hist.length > 60) hist.shift(); undoBtn.disabled = !hist.length; }
+  function undo() {
+    if (!hist.length) return;
+    var o = JSON.parse(hist.pop());
+    state.pieces = o.pieces; state.draws = o.draws; state.fa = o.fa; state.fb = o.fb;
+    undoBtn.disabled = !hist.length;
+    syncControls(); save(); render();
+  }
+
+  var HINTS = {
+    move: 'Drag any player or the ball to reposition it.',
+    pass: 'Press on a player and drag to a teammate to draw a pass. Ends snap to the nearest player.',
+    run: 'Drag to draw a dashed run for a player moving without the ball.',
+    free: 'Draw any path by hand, such as a dribble or a pressing curve.',
+    erase: 'Tap a line to remove it.'
+  };
+
+  function syncControls() {
+    selA.value = state.fa; selB.value = state.fb;
+    document.querySelectorAll('[data-tool]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.tool === state.tool)); });
+    document.querySelectorAll('[data-color]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.color === state.color)); });
+    document.getElementById('opp').setAttribute('aria-pressed', String(state.showB));
+    svg.setAttribute('class', 'tool-' + state.tool);
+    hintEl.textContent = HINTS[state.tool];
+  }
+
+  function pieceEl(p, i) {
+    var g = mk('g', { 'class': 'piece', 'data-i': i, transform: 'translate(' + p.x + ',' + p.y + ')' });
+    if (p.t === 'ball') {
+      mk('circle', { r: 13, 'class': 'ball' }, g);
+      mk('circle', { r: 4.5, 'class': 'ball-dot' }, g);
+      return g;
+    }
+    mk('circle', { r: 21, cy: 3, 'class': 'p-shadow' }, g);
+    mk('circle', { r: 20, 'class': 'p-' + p.t }, g);
+    var t = mk('text', { 'class': 'num' }, g);
+    t.textContent = p.n;
+    if (state.vertical) t.setAttribute('transform', 'rotate(-90)');
+    return g;
+  }
+
+  function head(tip, u, color, parent) {
+    var L = 18, W = 9, px = -u[1], py = u[0];
+    var pts = [tip[0], tip[1], tip[0] - u[0] * L + px * W, tip[1] - u[1] * L + py * W, tip[0] - u[0] * L - px * W, tip[1] - u[1] * L - py * W];
+    mk('polygon', { points: pts[0] + ',' + pts[1] + ' ' + pts[2] + ',' + pts[3] + ' ' + pts[4] + ',' + pts[5], fill: color, stroke: 'rgba(4,30,14,0.38)', 'stroke-width': 2, 'stroke-linejoin': 'round' }, parent);
+  }
+
+  function drawItem(d, i, isLive) {
+    var g = mk('g', {});
+    var pts = d.pts.map(function (q) { return [q[0], q[1]]; });
+    if (pts.length < 2) return g;
+    var u, a, b;
+    if (d.type !== 'free') {
+      a = pts[0]; b = pts[1];
+      var len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (len < 1) return g;
+      u = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+      if (d.ss) a = [a[0] + u[0] * 24, a[1] + u[1] * 24];
+      if (d.se) b = [b[0] - u[0] * 26, b[1] - u[1] * 26];
+      pts = [a, b];
+    } else {
+      var e = pts[pts.length - 1], k = pts.length - 2;
+      while (k > 0 && Math.hypot(e[0] - pts[k][0], e[1] - pts[k][1]) < 14) k--;
+      var st = pts[Math.max(k, 0)];
+      var l2 = Math.hypot(e[0] - st[0], e[1] - st[1]) || 1;
+      u = [(e[0] - st[0]) / l2, (e[1] - st[1]) / l2];
+    }
+    var end = pts[pts.length - 1];
+    var body = pts.slice();
+    body[body.length - 1] = [end[0] - u[0] * 8, end[1] - u[1] * 8];
+    var ds = body.map(function (q, j) { return (j ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1); }).join(' ');
+    mk('path', { d: ds, 'class': 'ln-shadow' }, g);
+    var main = mk('path', { d: ds, stroke: d.color, 'class': 'ln' }, g);
+    if (d.type === 'run') main.setAttribute('stroke-dasharray', '11 9');
+    head(end, u, d.color, g);
+    if (!isLive) mk('path', { d: ds, 'class': 'hit', 'data-di': i }, g);
+    return g;
+  }
+
+  function applyOrientation() {
+    if (state.vertical) {
+      svg.setAttribute('viewBox', '-30 -30 740 1110');
+      world.setAttribute('transform', 'translate(680,0) rotate(90)');
+    } else {
+      svg.setAttribute('viewBox', '-30 -30 1110 740');
+      world.removeAttribute('transform');
+    }
+  }
+
+  function render() {
+    applyOrientation();
+    gDraw.textContent = ''; gPieces.textContent = ''; gLive.textContent = '';
+    state.draws.forEach(function (d, i) { gDraw.appendChild(drawItem(d, i, false)); });
+    state.pieces.forEach(function (p, i) {
+      if (p.t === 'b' && !state.showB) return;
+      gPieces.appendChild(pieceEl(p, i));
+    });
+  }
+
+  function toWorld(e) {
+    var pt = svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    var m = world.getScreenCTM();
+    if (!m) return { x: 0, y: 0 };
+    var q = pt.matrixTransform(m.inverse());
+    return { x: q.x, y: q.y };
+  }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  function nearest(p) {
+    var best = null, bd = 34;
+    state.pieces.forEach(function (q) {
+      if (q.t === 'b' && !state.showB) return;
+      var d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d < bd) { bd = d; best = q; }
+    });
+    return best ? { x: best.x, y: best.y, s: true } : { x: p.x, y: p.y, s: false };
+  }
+
+  var drag = null, live = null;
+
+  svg.addEventListener('pointerdown', function (e) {
+    if (e.button > 0) return;
+    var p = toWorld(e);
+    if (state.tool === 'move') {
+      var g = e.target.closest ? e.target.closest('.piece') : null;
+      if (!g) return;
+      var piece = state.pieces[+g.getAttribute('data-i')];
+      pushHist();
+      drag = { g: g, piece: piece, ox: piece.x - p.x, oy: piece.y - p.y };
+      try { svg.setPointerCapture(e.pointerId); } catch (x) {}
+      g.style.cursor = 'grabbing';
+      e.preventDefault();
+    } else if (state.tool === 'erase') {
+      var h = e.target.closest ? e.target.closest('[data-di]') : null;
+      if (!h) return;
+      pushHist();
+      state.draws.splice(+h.getAttribute('data-di'), 1);
+      save(); render();
+    } else {
+      var first = state.tool === 'free' ? { x: p.x, y: p.y, s: false } : nearest(p);
+      live = { type: state.tool, color: state.color, pts: [[first.x, first.y]], ss: first.s, se: false };
+      try { svg.setPointerCapture(e.pointerId); } catch (x) {}
+      e.preventDefault();
+    }
+  });
+
+  svg.addEventListener('pointermove', function (e) {
+    if (drag) {
+      var p = toWorld(e);
+      drag.piece.x = Math.round(clamp(p.x + drag.ox, 6, 1044));
+      drag.piece.y = Math.round(clamp(p.y + drag.oy, 6, 674));
+      drag.g.setAttribute('transform', 'translate(' + drag.piece.x + ',' + drag.piece.y + ')');
+    } else if (live) {
+      var q = toWorld(e);
+      if (live.type === 'free') {
+        var last = live.pts[live.pts.length - 1];
+        if (Math.hypot(q.x - last[0], q.y - last[1]) > 5) live.pts.push([q.x, q.y]);
+      } else {
+        live.pts[1] = [q.x, q.y];
+      }
+      gLive.textContent = '';
+      gLive.appendChild(drawItem(live, 0, true));
+    }
+  });
+
+  function finish(e) {
+    if (drag) {
+      drag.g.style.cursor = '';
+      drag = null; save();
+    } else if (live) {
+      var d = live; live = null;
+      gLive.textContent = '';
+      if (d.type !== 'free') {
+        var q = toWorld(e), end = nearest(q);
+        d.pts = [d.pts[0], [end.x, end.y]];
+        d.se = end.s;
+      }
+      var a = d.pts[0], z = d.pts[d.pts.length - 1];
+      if (Math.hypot(z[0] - a[0], z[1] - a[1]) < 16) return;
+      pushHist();
+      d.pts = d.pts.map(function (v) { return [Math.round(v[0] * 10) / 10, Math.round(v[1] * 10) / 10]; });
+      state.draws.push(d);
+      save(); render();
+    }
+  }
+  svg.addEventListener('pointerup', finish);
+  svg.addEventListener('pointercancel', function () {
+    if (drag) { drag.g.style.cursor = ''; drag = null; save(); }
+    live = null; gLive.textContent = '';
+  });
+
+  function setFormation(team, key) {
+    pushHist();
+    if (team === 'a') state.fa = key; else state.fb = key;
+    state.pieces = state.pieces.filter(function (p) { return p.t !== team; }).concat(build(team, key));
+    state.pieces.sort(function (x, y) { return (x.t === 'ball') - (y.t === 'ball'); });
+    save(); render();
+  }
+  selA.addEventListener('change', function () { setFormation('a', selA.value); });
+  selB.addEventListener('change', function () { setFormation('b', selB.value); });
+
+  document.getElementById('bar').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.tool) { state.tool = b.dataset.tool; syncControls(); save(); }
+    else if (b.dataset.color) { state.color = b.dataset.color; syncControls(); save(); }
+    else if (b.dataset.act === 'undo') undo();
+    else if (b.dataset.act === 'clear') { if (state.draws.length) { pushHist(); state.draws = []; save(); render(); } }
+    else if (b.dataset.act === 'opp') { state.showB = !state.showB; syncControls(); save(); render(); }
+    else if (b.dataset.act === 'rotate') { state.vertical = !state.vertical; save(); render(); }
+    else if (b.dataset.act === 'reset') {
+      pushHist();
+      state.fa = '4-3-3'; state.fb = '4-4-2'; state.draws = []; state.pieces = fresh(state.fa, state.fb);
+      syncControls(); save(); render();
+    }
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+  });
+
+  syncControls();
+  render();
+})();
+</script>
+
+<script>
+(function () {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  }
+  var deferred = null, btn = document.getElementById('install');
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; btn.hidden = false; });
+  btn.addEventListener('click', function () {
+    if (!deferred) return;
+    deferred.prompt();
+    deferred.userChoice.finally(function () { deferred = null; btn.hidden = true; });
+  });
+  window.addEventListener('appinstalled', function () { btn.hidden = true; });
+})();
+</script>
+</body>
+</html>
